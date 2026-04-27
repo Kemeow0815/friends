@@ -27,12 +27,11 @@
 当你添加本站友链时，建议复制以下信息：
 
 ```yaml
-title: xaoxuu
-url: https://xaoxuu.com
-avatar: https://cn.cravatar.com/avatar/15e59a60168a6ce1bfc3eddfca8c5a54?s=512
-screenshot: https://xaoxuu.com/assets/xaoxuu/2022/10/23/63542895cfd29.png
-description: For all time, always.
-feed: https://xaoxuu.com/atom.xml
+title: 喵洛阁
+url: https://www.kemiaosw.top
+avatar: https://wsrv.nl/?url=github.com%2FKemeow0815.png
+screenshot: https://imgbed.268682.xyz/v2/wFOi4UQ.png
+description: 每一段旅行，都有终点。
+feed: https://kemeow0815.github.io/feed.xml
 ```
 
-> 头像地址末尾的 `s=512` 是尺寸，如果显示框架较小可以自行调节至合适的尺寸。
