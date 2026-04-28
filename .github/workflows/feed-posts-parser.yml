@@ -1,43 +1,106 @@
 name: Feed Posts Parser
 
 on:
-  workflow_dispatch: # Allows manual triggering
-  schedule:
-    # 每天凌晨5点运行一次
-    - cron: '0 21 * * *' # Runs daily at 21:00
+    workflow_dispatch: # Allows manual triggering
+    schedule:
+        # 每天凌晨5点运行一次
+        - cron: "0 21 * * *" # Runs daily at 21:00
 
 jobs:
-  feed-parser:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Run Feed Post Parser
-        uses: xaoxuu/feed-posts-parser@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          posts_count: 3 # 取 3 篇文章
-      # 重新生成一下JSON
-      - name: Generate data.json
-        uses: xaoxuu/issues2json@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          sort: 'posts-desc'
-          exclude_issue_with_labels: '审核中, 风险网站' # 具有哪些标签的issue不生成到JSON中
-          hide_labels: '白名单' # 这些标签不显示在前端页面
-      - name: Setup Git Config
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-      - name: Commit and Push to output branch
-        run: |
-          git fetch origin output || true
-          git checkout -B output
-          git add --all
-          git commit -m "Update data from issues" || echo "No changes to commit"
-          git push -f origin output
+    feed-parser:
+        runs-on: ubuntu-latest
+        permissions:
+            issues: write
+            contents: write
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+            - name: Run Feed Post Parser
+              uses: xaoxuu/feed-posts-parser@main
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  posts_count: 3 # 取 3 篇文章
+            # 重新生成一下JSON
+            - name: Generate data.json
+              uses: xaoxuu/issues2json@main
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  sort: "posts-desc"
+                  exclude_issue_with_labels: "审核中, 风险网站" # 具有哪些标签的issue不生成到JSON中
+                  hide_labels: "白名单" # 这些标签不显示在前端页面
+            - name: Setup Git Config
+              run: |
+                  git config --global user.name 'github-actions[bot]'
+                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            - name: Commit and Push to output branch
+              run: |
+                  git fetch origin output || true
+                  git checkout -B output
+                  git add --all
+                  git commit -m "Update data from issues" || echo "No changes to commit"
+                  git push -f origin output
+
+    sync-to-fcircle:
+        needs: feed-parser
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout main branch
+              uses: actions/checkout@v4
+              with:
+                  ref: main
+                  fetch-depth: 0
+
+            - name: Fetch output branch data.json
+              run: |
+                  curl -sL https://raw.githubusercontent.com/${{ github.repository }}/output/v2/data.json -o /tmp/data.json
+                  echo "Downloaded data.json from output branch"
+
+            - name: Convert JSON to fcircle.json format
+              run: |
+                  python3 << 'EOF'
+                  import json
+
+                  # 读取 output 分支的 data.json
+                  with open('/tmp/data.json', 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+
+                  # 提取需要的字段并转换格式
+                  friends_list = []
+                  for item in data.get('content', []):
+                      title = item.get('title', '')
+                      url = item.get('url', '')
+                      icon = item.get('icon', '')
+                      if title and url:  # 确保至少有标题和URL
+                          friends_list.append([title, url, icon])
+
+                  # 构建输出格式
+                  output_data = {
+                      "friends": friends_list
+                  }
+
+                  # 写入 fcircle.json
+                  with open('fcircle.json', 'w', encoding='utf-8') as f:
+                      json.dump(output_data, f, ensure_ascii=False, indent=2)
+
+                  print(f"Converted {len(friends_list)} friends to fcircle.json")
+                  EOF
+
+            - name: Setup Git Config
+              run: |
+                  git config --global user.name 'github-actions[bot]'
+                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+            - name: Commit and Push changes
+              run: |
+                  git add fcircle.json
+                  if git diff --cached --quiet; then
+                    echo "No changes to commit"
+                  else
+                    git commit -m "Sync friends data from output branch to fcircle.json"
+                    git push origin main
+                    echo "Successfully updated fcircle.json"
+                  fi

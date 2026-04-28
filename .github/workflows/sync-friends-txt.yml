@@ -1,0 +1,64 @@
+name: Sync Friends to fcircle.json
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - output
+
+jobs:
+  sync-friends:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch output branch data.json
+        run: |
+          curl -sL https://raw.githubusercontent.com/${{ github.repository }}/output/v2/data.json -o /tmp/data.json
+          echo "Downloaded data.json from output branch"
+
+      - name: Convert JSON to fcircle.json format
+        run: |
+          python3 << 'EOF'
+          import json
+
+          with open('/tmp/data.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+
+          friends_list = []
+          for item in data.get('content', []):
+              title = item.get('title', '')
+              url = item.get('url', '')
+              icon = item.get('icon', '')
+              if title and url:
+                  friends_list.append([title, url, icon])
+
+          output_data = {"friends": friends_list}
+
+          with open('fcircle.json', 'w', encoding='utf-8') as f:
+              json.dump(output_data, f, ensure_ascii=False, indent=2)
+
+          print(f"Converted {len(friends_list)} friends to fcircle.json")
+          EOF
+
+      - name: Setup Git Config
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Commit and Push changes
+        run: |
+          git add fcircle.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Sync friends data from output branch to fcircle.json"
+            git push origin main
+            echo "Successfully updated fcircle.json"
+          fi
