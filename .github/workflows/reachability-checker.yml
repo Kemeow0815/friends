@@ -1,78 +1,78 @@
 name: Reachability Checker
 
 on:
-  issues:
-    types: [opened, closed, reopened, labeled, unlabeled]
-  workflow_dispatch:
-  schedule:
-    - cron: '0 20 * * *'
+    issues:
+        types: [ opened, closed, reopened, labeled, unlabeled ]
+    workflow_dispatch:
+    schedule:
+        - cron: "0 20 * * *"
 
 jobs:
-  reachability-checker:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    reachability-checker:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            issues: write
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Check Reachability
-        uses: xaoxuu/links-checker@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          checker: 'reachability'
-          unreachable_label: '失联'
-          exclude_issue_with_labels: '审核中, 白名单'
+            - name: Check Reachability
+              uses: xaoxuu/links-checker@main
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  checker: "reachability"
+                  unreachable_label: "失联"
+                  exclude_issue_with_labels: "审核中, 白名单"
 
-      - name: Generate data.json
-        uses: xaoxuu/issues2json@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          sort: 'posts-desc'
-          exclude_issue_with_labels: '审核中, 风险网站'
-          hide_labels: '白名单'
+            - name: Generate data.json
+              uses: xaoxuu/issues2json@main
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  sort: "posts-desc"
+                  exclude_issue_with_labels: "审核中, 风险网站"
+                  hide_labels: "白名单"
 
-      - name: Generate lose.json
-        run: |
-          python3 << 'EOF'
-          import json
+            - name: Generate lose.json
+              run: |
+                  python3 << 'EOF'
+                  import json
 
-          # 读取生成的 data.json
-          with open('data.json', 'r', encoding='utf-8') as f:
-              data = json.load(f)
+                  # 读取生成的 v2/data.json
+                  with open('v2/data.json', 'r', encoding='utf-8') as f:
+                      data = json.load(f)
 
-          # 筛选出带有 "失联" 标签的友链
-          lost_friends = []
-          for item in data.get('content', []):
-              labels = item.get('labels', [])
-              label_names = [label.get('name', '') for label in labels]
-              if '失联' in label_names:
-                  lost_friends.append({
-                      'title': item.get('title', ''),
-                      'icon': item.get('icon', '')
-                  })
+                  # 筛选出带有 "失联" 标签的友链
+                  lost_friends = []
+                  for item in data.get('content', []):
+                      labels = item.get('labels', [])
+                      label_names = [label.get('name', '') for label in labels]
+                      if '失联' in label_names:
+                          lost_friends.append({
+                              'title': item.get('title', ''),
+                              'icon': item.get('icon', '')
+                          })
 
-          # 构建 lose.json
-          lose_data = {'lost': lost_friends}
+                  # 构建 lose.json
+                  lose_data = {'lost': lost_friends}
 
-          with open('lose.json', 'w', encoding='utf-8') as f:
-              json.dump(lose_data, f, ensure_ascii=False, indent=2)
+                  with open('v2/lose.json', 'w', encoding='utf-8') as f:
+                      json.dump(lose_data, f, ensure_ascii=False, indent=2)
 
-          print(f"Generated lose.json with {len(lost_friends)} lost friends")
-          EOF
+                  print(f"Generated v2/lose.json with {len(lost_friends)} lost friends")
+                  EOF
 
-      - name: Setup Git Config
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            - name: Setup Git Config
+              run: |
+                  git config --global user.name 'github-actions[bot]'
+                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Commit and Push to output branch
-        run: |
-          git fetch origin output || true
-          git checkout -B output
-          git add --all
-          git commit -m "Update data from issues" || echo "No changes to commit"
-          git push -f origin output
+            - name: Commit and Push to output branch
+              run: |
+                  git fetch origin output || true
+                  git checkout -B output
+                  git add --all
+                  git commit -m "Update data from issues" || echo "No changes to commit"
+                  git push -f origin output
