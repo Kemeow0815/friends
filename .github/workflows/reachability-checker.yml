@@ -1,30 +1,22 @@
 name: Reachability Checker
 
-# Controls when the workflow will run
 on:
   issues:
-    # 新增（打开）/关闭/重新打开/设置标签/移除标签
     types: [opened, closed, reopened, labeled, unlabeled]
-  # 手动触发
   workflow_dispatch:
-  # 每天凌晨4点运行一次
   schedule:
     - cron: '0 20 * * *'
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   reachability-checker:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      # 检查链接状态
+
       - name: Check Reachability
         uses: xaoxuu/links-checker@main
         env:
@@ -32,20 +24,51 @@ jobs:
         with:
           checker: 'reachability'
           unreachable_label: '失联'
-          exclude_issue_with_labels: '审核中, 白名单' # 具有哪些标签的issue不进行检查
-      # 检查完毕后重新生成一下JSON
+          exclude_issue_with_labels: '审核中, 白名单'
+
       - name: Generate data.json
         uses: xaoxuu/issues2json@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           sort: 'posts-desc'
-          exclude_issue_with_labels: '审核中, 风险网站' # 具有哪些标签的issue不生成到JSON中
-          hide_labels: '白名单' # 这些标签不显示在前端页面
+          exclude_issue_with_labels: '审核中, 风险网站'
+          hide_labels: '白名单'
+
+      - name: Generate lose.json
+        run: |
+          python3 << 'EOF'
+          import json
+
+          # 读取生成的 data.json
+          with open('data.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+
+          # 筛选出带有 "失联" 标签的友链
+          lost_friends = []
+          for item in data.get('content', []):
+              labels = item.get('labels', [])
+              label_names = [label.get('name', '') for label in labels]
+              if '失联' in label_names:
+                  lost_friends.append({
+                      'title': item.get('title', ''),
+                      'icon': item.get('icon', '')
+                  })
+
+          # 构建 lose.json
+          lose_data = {'lost': lost_friends}
+
+          with open('lose.json', 'w', encoding='utf-8') as f:
+              json.dump(lose_data, f, ensure_ascii=False, indent=2)
+
+          print(f"Generated lose.json with {len(lost_friends)} lost friends")
+          EOF
+
       - name: Setup Git Config
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
       - name: Commit and Push to output branch
         run: |
           git fetch origin output || true
