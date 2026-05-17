@@ -15,233 +15,21 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-            - name: Install dependencies
-              run: |
-                  npm init -y
-                  npm install axios cheerio @actions/core @actions/github cloudscraper
-            - name: Create feed parser script
-              run: |
-                  cat > feed-parser.js <<-'EOF'
-const core = require('@actions/core');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const github = require('@actions/github');
-const cloudscraper = require('cloudscraper');
-
-const RETRY_TIMES = core.getInput('retry_times') || 3;
-const POSTS_COUNT = 3;
-const DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss';
-const TIMEZONE = '+8';
-
-function formatDate(dateStr, format, timezone) {
-    try {
-        const date = new Date(dateStr);
-        const offset = parseInt(timezone) * 60;
-        date.setMinutes(date.getMinutes() + offset + date.getTimezoneOffset());
-        const pad = (n) => n.toString().padStart(2, '0');
-        return format
-            .replace('YYYY', date.getFullYear())
-            .replace('MM', pad(date.getMonth() + 1))
-            .replace('DD', pad(date.getDate()))
-            .replace('HH', pad(date.getHours()))
-            .replace('mm', pad(date.getMinutes()))
-            .replace('ss', pad(date.getSeconds()));
-    } catch {
-        return '';
-    }
-}
-
-async function parseFeed(feedUrl) {
-    let responseData;
-    let method = 'axios';
-
-    try {
-        console.log(`Trying axios for ${feedUrl}`);
-        const response = await axios.get(feedUrl, {
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9'
-            }
-        });
-        responseData = response.data;
-        console.log(`Axios request succeeded for ${feedUrl}`);
-    } catch (error) {
-        console.log(`Axios failed with error: ${error.message}`);
-        console.log(`Falling back to cloudscraper for ${feedUrl}`);
-        method = 'cloudscraper';
-        try {
-            responseData = await cloudscraper.get(feedUrl, {
-                timeout: 60000,
-                headers: {
-                    'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
-            });
-            console.log(`Cloudscraper request succeeded for ${feedUrl}`);
-        } catch (cloudError) {
-            console.error(`Cloudscraper failed: ${cloudError.message}`);
-            console.log(`Falling back to curl command for ${feedUrl}`);
-            method = 'curl';
-            try {
-                const { execSync } = require('child_process');
-                const curlCommand = `curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -H "Accept: application/rss+xml, application/xml, text/xml;q=0.9" --connect-timeout 30 "${feedUrl}"`;
-                responseData = execSync(curlCommand, { timeout: 60000 }).toString();
-                console.log(`Curl command succeeded for ${feedUrl}`);
-            } catch (curlError) {
-                console.error(`All methods failed for ${feedUrl}: ${curlError.message}`);
-                return [];
-            }
-        }
-    }
-
-    console.log(`Method used: ${method}`);
-    console.log(`Content type: ${typeof responseData}`);
-    console.log(`Content length: ${typeof responseData === 'string' ? responseData.length : 'N/A'}`);
-
-    if (typeof responseData === 'string') {
-        const previewLength = Math.min(1000, responseData.length);
-        console.log(`Content preview (first ${previewLength} chars):`);
-        console.log('--- START OF CONTENT ---');
-        console.log(responseData.substring(0, previewLength));
-        console.log('--- END OF CONTENT ---');
-    }
-
-    try {
-        const $ = cheerio.load(responseData, {
-            xmlMode: true,
-            decodeEntities: true
-        });
-        const posts = [];
-
-        let isRss = false;
-        let items = $('feed > entry');
-        if (items.length === 0) {
-            items = $('rss > channel > item');
-            if (items.length > 0) {
-                isRss = true;
-            }
-        }
-
-        console.log(`Found ${items.length} items in feed (isRss: ${isRss})`);
-
-        if (items.length === 0 && typeof responseData === 'string') {
-            console.log('Trying non-xml mode parsing...');
-            const html$ = cheerio.load(responseData);
-            items = html$('item');
-            console.log(`Found ${items.length} items in HTML mode`);
-        }
-
-        items.slice(0, POSTS_COUNT).each((i, el) => {
-            const $item = cheerio(el);
-            const title = $item.find('title').first().text();
-
-            let link;
-            if (isRss) {
-                link = $item.find('link').first().text();
-            } else {
-                link = $item.find('link[rel="alternate"]').attr('href');
-                if (!link) {
-                    link = $item.find('link').attr('href');
-                }
-            }
-
-            let publishedDateStr;
-            if (isRss) {
-                publishedDateStr = $item.find('pubDate').first().text();
-            } else {
-                publishedDateStr = $item.find('published').first().text();
-            }
-
-            const formattedPublished = publishedDateStr ? formatDate(publishedDateStr, DATE_FORMAT, TIMEZONE) : '';
-
-            if (title && link) {
-                posts.push({ title, link, published: formattedPublished });
-                console.log(`Extracted post: ${title}`);
-            }
-        });
-
-        console.log(`Total posts extracted: ${posts.length}`);
-        return posts;
-    } catch (error) {
-        console.error(`Error parsing feed from ${feedUrl}: ${error.message}`);
-        if (typeof responseData === 'string') {
-            console.log(`Response data preview (first 1000 chars):\n${responseData.substring(0, 1000)}`);
-        }
-        return [];
-    }
-}
-
-async function run() {
-    const token = process.env.GITHUB_TOKEN;
-    const owner = github.context.repo.owner;
-    const repo = github.context.repo.repo;
-    const octokit = github.getOctokit(token);
-
-    try {
-        console.log('>> 开始');
-        const { data: issues } = await octokit.rest.issues.listForRepo({
-            owner,
-            repo,
-            state: 'open'
-        });
-
-        for (const issue of issues) {
-            if (!issue.body) continue;
-
-            const match = issue.body.match(/```json\s*\{[\s\S]*?\}\s*```/m);
-            const jsonMatch = match ? match[0].match(/\{[\s\S]*\}/m) : null;
-
-            if (!jsonMatch) continue;
-
-            try {
-                const jsonData = JSON.parse(jsonMatch[0]);
-                const feedUrl = jsonData.feed;
-
-                if (feedUrl) {
-                    console.log(`Getting feed data from ${feedUrl}`);
-                    const posts = await parseFeed(feedUrl);
-                    jsonData.posts = posts;
-
-                    const newBody = issue.body.replace(jsonMatch[0], JSON.stringify(jsonData, null, 2));
-                    await octokit.rest.issues.update({
-                        owner,
-                        repo,
-                        issue_number: issue.number,
-                        body: newBody
-                    });
-                    console.log(`Updated issue #${issue.number} with ${posts.length} posts`);
-                }
-            } catch (error) {
-                console.error(`Error processing issue #${issue.number}: ${error.message}`);
-            }
-        }
-
-        console.log('>> 结束');
-    } catch (error) {
-        console.error('Error processing issues:', error.message);
-        process.exit(1);
-    }
-}
-
-run();
-EOF
             - name: Run Feed Post Parser
+              uses: xaoxuu/feed-posts-parser@main
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: node feed-parser.js
+              with:
+                  posts_count: 3 # 取 3 篇文章
+            # 重新生成一下JSON
             - name: Generate data.json
               uses: xaoxuu/issues2json@main
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   sort: "posts-desc"
-                  exclude_issue_with_labels: "审核中, 风险网站"
-                  hide_labels: "白名单"
+                  exclude_issue_with_labels: "审核中, 风险网站" # 具有哪些标签的issue不生成到JSON中
+                  hide_labels: "白名单" # 这些标签不显示在前端页面
             - name: Setup Git Config
               run: |
                   git config --global user.name 'github-actions[bot]'
@@ -265,39 +53,47 @@ EOF
               with:
                   ref: main
                   fetch-depth: 0
+
             - name: Fetch output branch data.json
               run: |
                   curl -sL https://raw.githubusercontent.com/${{ github.repository }}/output/v2/data.json -o /tmp/data.json
                   echo "Downloaded data.json from output branch"
+
             - name: Convert JSON to fcircle.json format
               run: |
                   python3 << 'EOF'
-import json
+                  import json
 
-with open('/tmp/data.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
+                  # 读取 output 分支的 data.json
+                  with open('/tmp/data.json', 'r', encoding='utf-8') as f:
+                      data = json.load(f)
 
-friends_list = []
-for item in data.get('content', []):
-    title = item.get('title', '')
-    url = item.get('url', '')
-    icon = item.get('icon', '')
-    if title and url:
-        friends_list.append([title, url, icon])
+                  # 提取需要的字段并转换格式
+                  friends_list = []
+                  for item in data.get('content', []):
+                      title = item.get('title', '')
+                      url = item.get('url', '')
+                      icon = item.get('icon', '')
+                      if title and url:  # 确保至少有标题和URL
+                          friends_list.append([title, url, icon])
 
-output_data = {
-    "friends": friends_list
-}
+                  # 构建输出格式
+                  output_data = {
+                      "friends": friends_list
+                  }
 
-with open('fcircle.json', 'w', encoding='utf-8') as f:
-    json.dump(output_data, f, ensure_ascii=False, indent=2)
+                  # 写入 fcircle.json
+                  with open('fcircle.json', 'w', encoding='utf-8') as f:
+                      json.dump(output_data, f, ensure_ascii=False, indent=2)
 
-print(f"Converted {len(friends_list)} friends to fcircle.json")
-EOF
+                  print(f"Converted {len(friends_list)} friends to fcircle.json")
+                  EOF
+
             - name: Setup Git Config
               run: |
                   git config --global user.name 'github-actions[bot]'
                   git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
             - name: Commit and Push changes
               run: |
                   git add fcircle.json
