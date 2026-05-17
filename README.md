@@ -12,7 +12,7 @@
 1. 确保符合**安全合规**的硬性条件，且不会对本站进行高频爬取。
 2. 提交友链意向申请，如实填写。（此时不必提前添加本站为友链）
 3. 完成友链任务，未完成的不要随意勾选。（如果迟迟没有通过审核，请检查 issue 中列出的任务是否完成。）
-4. 博主审核通过，此时请及时添加本站友链。
+5. 博主审核通过，此时请及时添加本站友链(有些网站目前检测可能会失败，我会定时查看然后通过)。
 
 <br>
 
@@ -32,6 +32,6 @@ url: https://www.kemiaosw.top
 avatar: https://wsrv.nl/?url=github.com%2FKemeow0815.png
 screenshot: https://imgbed.268682.xyz/v2/wFOi4UQ.png
 description: 每一段旅行，都有终点。
-feed: https://kemeow0815.github.io/feed.xml
+feed: https://blog.kemeow.top/rss.xml
 ```
 
