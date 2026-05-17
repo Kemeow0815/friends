@@ -15,12 +15,184 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+            - name: Install dependencies
+              run: |
+                  npm init -y
+                  npm install axios cheerio puppeteer @actions/core @actions/github
+            - name: Create feed parser script
+              run: |
+                  cat > feed-parser.js << 'EOF'
+                  import * as core from '@actions/core';
+                  import axios from 'axios';
+                  import * as cheerio from 'cheerio';
+                  import puppeteer from 'puppeteer';
+                  import * as github from '@actions/github';
+
+                  const RETRY_TIMES = core.getInput('retry_times') || 3;
+                  const POSTS_COUNT = 3;
+                  const DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss';
+                  const TIMEZONE = '+8';
+
+                  function formatDate(dateStr, format, timezone) {
+                      try {
+                          const date = new Date(dateStr);
+                          const offset = parseInt(timezone) * 60;
+                          date.setMinutes(date.getMinutes() + offset + date.getTimezoneOffset());
+                          const pad = (n) => n.toString().padStart(2, '0');
+                          return format
+                              .replace('YYYY', date.getFullYear())
+                              .replace('MM', pad(date.getMonth() + 1))
+                              .replace('DD', pad(date.getDate()))
+                              .replace('HH', pad(date.getHours()))
+                              .replace('mm', pad(date.getMinutes()))
+                              .replace('ss', pad(date.getSeconds()));
+                      } catch {
+                          return '';
+                      }
+                  }
+
+                  async function parseFeedWithPuppeteer(feedUrl) {
+                      const browser = await puppeteer.launch({
+                          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+                          headless: true
+                      });
+                      try {
+                          const page = await browser.newPage();
+                          await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                          await page.goto(feedUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+                          const content = await page.content();
+                          return content;
+                      } finally {
+                          await browser.close();
+                      }
+                  }
+
+                  async function parseFeed(feedUrl) {
+                      let responseData;
+                      try {
+                          const response = await axios.get(feedUrl, {
+                              timeout: 15000,
+                              headers: {
+                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                  'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9'
+                              }
+                          });
+                          responseData = response.data;
+                      } catch (error) {
+                          console.log(`Falling back to puppeteer for ${feedUrl}`);
+                          responseData = await parseFeedWithPuppeteer(feedUrl);
+                      }
+
+                      try {
+                          const $ = cheerio.load(responseData, { xmlMode: true });
+                          const posts = [];
+
+                          let isRss = false;
+                          let items = $('feed > entry');
+                          if (items.length === 0) {
+                              items = $('rss > channel > item');
+                              if (items.length > 0) {
+                                  isRss = true;
+                              }
+                          }
+
+                          items.slice(0, POSTS_COUNT).each((i, el) => {
+                              const $item = $(el);
+                              const title = $item.find('title').first().text();
+
+                              let link;
+                              if (isRss) {
+                                  link = $item.find('link').first().text();
+                              } else {
+                                  link = $item.find('link[rel="alternate"]').attr('href');
+                                  if (!link) {
+                                      link = $item.find('link').attr('href');
+                                  }
+                              }
+
+                              let publishedDateStr;
+                              if (isRss) {
+                                  publishedDateStr = $item.find('pubDate').first().text();
+                              } else {
+                                  publishedDateStr = $item.find('published').first().text();
+                              }
+
+                              const formattedPublished = publishedDateStr ? formatDate(publishedDateStr, DATE_FORMAT, TIMEZONE) : '';
+
+                              if (title && link) {
+                                  posts.push({ title, link, published: formattedPublished });
+                              }
+                          });
+
+                          return posts;
+                      } catch (error) {
+                          console.error(`Error parsing feed from ${feedUrl}: ${error.message}`);
+                          return [];
+                      }
+                  }
+
+                  async function run() {
+                      const token = process.env.GITHUB_TOKEN;
+                      const owner = github.context.repo.owner;
+                      const repo = github.context.repo.repo;
+                      const octokit = github.getOctokit(token);
+
+                      try {
+                          console.log('>> 开始');
+                          const { data: issues } = await octokit.rest.issues.listForRepo({
+                              owner,
+                              repo,
+                              state: 'open'
+                          });
+
+                          for (const issue of issues) {
+                              if (!issue.body) continue;
+
+                              const match = issue.body.match(/```json\s*\{[\s\S]*?\}\s*```/m);
+                              const jsonMatch = match ? match[0].match(/\{[\s\S]*\}/m) : null;
+
+                              if (!jsonMatch) continue;
+
+                              try {
+                                  const jsonData = JSON.parse(jsonMatch[0]);
+                                  const feedUrl = jsonData.feed;
+
+                                  if (feedUrl) {
+                                      console.log(`Getting feed data from ${feedUrl}`);
+                                      const posts = await parseFeed(feedUrl);
+                                      jsonData.posts = posts;
+
+                                      const newBody = issue.body.replace(jsonMatch[0], JSON.stringify(jsonData, null, 2));
+                                      await octokit.rest.issues.update({
+                                          owner,
+                                          repo,
+                                          issue_number: issue.number,
+                                          body: newBody
+                                      });
+                                      console.log(`Updated issue #${issue.number}`);
+                                  }
+                              } catch (error) {
+                                  console.error(`Error processing issue #${issue.number}: ${error.message}`);
+                              }
+                          }
+
+                          console.log('>> 结束');
+                      } catch (error) {
+                          console.error('Error processing issues:', error.message);
+                          process.exit(1);
+                      }
+                  }
+
+                  run();
+                  EOF
             - name: Run Feed Post Parser
-              uses: xaoxuu/feed-posts-parser@main
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  posts_count: 3 # 取 3 篇文章
+              run: node feed-parser.js
             # 重新生成一下JSON
             - name: Generate data.json
               uses: xaoxuu/issues2json@main
