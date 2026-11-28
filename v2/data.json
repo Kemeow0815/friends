@@ -1,0 +1,164 @@
+{
+  "version": "v2",
+  "content": [
+    {
+      "title": "iMaeGoo’s Blog",
+      "url": "https://www.imaegoo.com/",
+      "icon": "https://cdn.jsdelivr.net/npm/imaegoo/avatar.jpg",
+      "snapshot": "https://jsd.268682.xyz/gh/Kemeow0815/img@main/img/iMaeGoo.webp",
+      "description": "虹墨空间站",
+      "feed": "https://www.imaegoo.com/atom.xml",
+      "posts": [
+        {
+          "title": "Linux 版微信关掉窗口后点 Dock 图标没反应？摸清它的托盘激活逻辑，写个包装脚本彻底解决",
+          "link": "https://www.imaegoo.com/2026/linux-wechat-dock-tray-restore/",
+          "published": "2026-11-27 14:20"
+        },
+        {
+          "title": "H3C MegaBook 安装 Ubuntu，和原厂 Windows、Android 组成三系统",
+          "link": "https://www.imaegoo.com/2026/h3c-megabook-ubuntu/",
+          "published": "2026-11-26 18:00"
+        },
+        {
+          "title": "在一个网站下远程管理多台设备上的 DeepSeek Harness",
+          "link": "https://www.imaegoo.com/2026/remote-manage-deepseek-harness/",
+          "published": "2026-10-24 18:00"
+        }
+      ],
+      "issue_number": 4,
+      "labels": [
+        {
+          "name": "推荐",
+          "color": "d947d2",
+          "hue": 303,
+          "saturation": 66,
+          "lightness": 56
+        }
+      ]
+    },
+    {
+      "title": "纸鹿摸鱼处",
+      "url": "https://blog.zhilu.site/",
+      "icon": "https://www.zhilu.site/api/avatar.png",
+      "snapshot": "https://jsd.268682.xyz/gh/Kemeow0815/img@main/img/zhilu.webp",
+      "description": "纸鹿至麓不知路，支炉制露不止漉",
+      "feed": "https://blog.zhilu.site/atom.xml",
+      "posts": [
+        {
+          "title": "我的macOS与AI环境配置偏好",
+          "link": "https://blog.zhilu.site/2026/macos-ai-setup",
+          "published": "2026-11-22 18:36"
+        },
+        {
+          "title": "不在大学",
+          "link": "https://blog.zhilu.site/2026/out-of-campus",
+          "published": "2026-05-03 10:47"
+        },
+        {
+          "title": "北京实习300天",
+          "link": "https://blog.zhilu.site/2026/beijing-intern",
+          "published": "2026-03-19 00:31"
+        }
+      ],
+      "issue_number": 6,
+      "labels": [
+        {
+          "name": "推荐",
+          "color": "d947d2",
+          "hue": 303,
+          "saturation": 66,
+          "lightness": 56
+        }
+      ]
+    },
+    {
+      "title": "张洪Heo",
+      "url": "https://blog.zhheo.com/",
+      "icon": "https://img.zhheo.com/i/67d8fa75943e4.webp",
+      "snapshot": "https://img.zhheo.com/i/67d8fb3c51399.webp",
+      "description": "分享设计与科技生活",
+      "feed": "https://blog.zhheo.com/atom.xml",
+      "posts": [
+        {
+          "title": "HeoPWA发布：安卓手机的网页转应用小工具",
+          "link": "https://blog.zhheo.com/p/0ycqbkty.html",
+          "published": "2026-11-16 15:57"
+        },
+        {
+          "title": "苹果M芯片我该怎么选？M1和M6到底在做某件事的时候差多少？",
+          "link": "https://blog.zhheo.com/p/st6h457x.html",
+          "published": "2026-11-13 11:55"
+        },
+        {
+          "title": "博客七周年记",
+          "link": "https://blog.zhheo.com/p/74qioc4q.html",
+          "published": "2026-11-09 12:16"
+        }
+      ],
+      "issue_number": 1,
+      "labels": [
+        {
+          "name": "推荐",
+          "color": "d947d2",
+          "hue": 303,
+          "saturation": 66,
+          "lightness": 56
+        }
+      ]
+    },
+    {
+      "title": "清羽飞扬",
+      "url": "https://blog.liushen.fun/",
+      "icon": "https://blog.liushen.fun/info/avatar.ico",
+      "snapshot": "https://blog.liushen.fun/info/siteshot.jpg",
+      "description": "柳影曳曳，清酒孤灯，扬笔撒墨，心境如霜",
+      "feed": "https://blog.liushen.fun/atom.xml",
+      "posts": [
+        {
+          "title": "以少年之名，赴人间之约",
+          "link": "https://blog.liushen.fun/posts/05e5180f/",
+          "published": "2026-11-09 00:54"
+        },
+        {
+          "title": "近期开发的四个开源项目",
+          "link": "https://blog.liushen.fun/posts/6a6de263/",
+          "published": "2026-09-09 02:12"
+        },
+        {
+          "title": "AxonHub - 多模型API智能路由网关",
+          "link": "https://blog.liushen.fun/posts/b404081c/",
+          "published": "2026-08-07 01:12"
+        }
+      ],
+      "issue_number": 3,
+      "labels": [
+        {
+          "name": "推荐",
+          "color": "d947d2",
+          "hue": 303,
+          "saturation": 66,
+          "lightness": 56
+        }
+      ]
+    },
+    {
+      "title": "二叉树树",
+      "url": "https://2x.nz",
+      "icon": "https://q2.qlogo.cn/headimg_dl?dst_uin=2726730791&spec=0",
+      "snapshot": "https://jsd.268682.xyz/gh/Kemeow0815/img@main/img/2xnz.webp",
+      "description": "Protect What You Love.",
+      "feed": "https://blog.2x.nz/rss.xml",
+      "posts": [],
+      "issue_number": 2,
+      "labels": [
+        {
+          "name": "推荐",
+          "color": "d947d2",
+          "hue": 303,
+          "saturation": 66,
+          "lightness": 56
+        }
+      ]
+    }
+  ]
+}
